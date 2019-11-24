@@ -195,7 +195,6 @@ EXPRESSIONS = [
     UnaryExpression(Keyword('comment'), String, Nothing),
     UnaryExpression(Keyword('commitoverlay'), Control, Nothing),
     UnaryExpression(Keyword('compile'), String, Code),
-    UnaryExpression(Keyword('compile'), Array, Code),
     UnaryExpression(Keyword('compilefinal'), String, Code),
     UnaryExpression(Keyword('completedfsm'), Number, Boolean),
     UnaryExpression(Keyword('composetext'), Array, String),
