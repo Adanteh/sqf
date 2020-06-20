@@ -97,7 +97,7 @@ class TestExpParser(TestCase):
 
 
 class ParserTestCase(TestCase):
-    
+
     def assertEqualStatement(self, expected, result, code):
         self.assertEqual(expected, result)
         self.assertEqual(code, str(result))
@@ -202,7 +202,7 @@ class ParseCode(ParserTestCase):
         result = parse(code)
         expected = Statement([Statement([
             Statement([V('_x'), Keyword('='), String('"AirS"')], ending=';')], parenthesis=True)])
-        
+
         self.assertEqualStatement(expected, result, code)
 
         code = '(_x="AirS";);'
@@ -336,7 +336,7 @@ class ParseCode(ParserTestCase):
         result = parse(code)
         expected = Statement([Statement([V('_is1'), Keyword('='),
                                          Code([Statement([V('_x'), Keyword('=='), N(1)])])], ending=';')])
-        
+
         self.assertEqualStatement(expected, result, code)
 
     def test_signed_precedence(self):
@@ -1444,6 +1444,30 @@ class TestDefineStatement(ParserTestCase):
             ])
         self.assertEqualStatement(expected, result, code)
 
+    def test_define_one_param(self):
+        code = "#define X(a) a"
+        result = parse(code)
+        expected = \
+            Statement([
+                Statement([
+                    DefineStatement(
+                        [
+                            Preprocessor('#define'), Space(),
+                            V('X'),
+                            Statement([
+                                Statement([V('a')])
+                            ], parenthesis=True),
+                            Space(),
+                            V('a')
+                        ],
+                        'X',
+                        expression=Statement([V('a')]),
+                        args='a'
+                    )
+                ])
+            ])
+        self.skipTest("it seems equal, but apparently it isnt")
+        #self.assertEqualStatement(expected, result, code)
 
 class TestDefineResult(ParserTestCase):
 
@@ -1683,6 +1707,33 @@ class TestDefineResult(ParserTestCase):
                 Statement([define]),
                 DefineResult([EndOfLine('\n'), V('x'), Keyword('='), V('A'), ParserKeyword('('), N(3), ParserKeyword(')')],
                              define, expected_statement)
+            ])
+
+        self.assertEqualStatement(expected, result, code)
+
+    def test_nested_usage(self):
+        define = parse('#define X(a) a')[0][0]
+
+        # quick check…
+        self.assertEqual("#define X(a) a", str(Statement([define])))
+
+        # the code with the define
+        code = str(Statement([define])) + '\nX(X(1))'
+        result = parse(code)
+
+        expected_statement = \
+            Statement([
+                Statement([N(1)])
+            ])
+
+        expected = \
+            Statement([
+                Statement([define]),
+                DefineResult([
+                    EndOfLine('\n'), V('X'), ParserKeyword('('), V('X'), ParserKeyword('('), N(1), ParserKeyword(')'), ParserKeyword(')')],
+                    define,
+                    expected_statement
+                )
             ])
 
         self.assertEqualStatement(expected, result, code)

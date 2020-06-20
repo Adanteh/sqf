@@ -353,11 +353,13 @@ class Analyzer(BaseInterpreter):
             outcome.position = base_tokens[0].position
             return outcome
         elif is_undefined_define(base_tokens):
+
             # get all arguments and compute their value to analyze them
             if isinstance(base_tokens[1].base_tokens[0], Statement):
                 sub_tokens = base_tokens[1].base_tokens[0].base_tokens
             else:
                 sub_tokens = base_tokens[0]
+#            raise ValueError('halp')
             for sub_token in sub_tokens:
                 self.value(sub_token)
 
