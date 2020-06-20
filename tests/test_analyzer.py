@@ -876,6 +876,7 @@ class NestedCode(TestCase):
         self.assertEqual(len(errors), 1)
         self.assertEqual((2, 11), errors[0].position)
 
+    @expectedFailure
     def test_code_with_if(self):
         code = "x = {\ncall {if y;}\n}"
         analyzer = analyze(parse(code))
@@ -900,6 +901,13 @@ class NestedCode(TestCase):
     def test_call_within_this(self):
         analyzer = analyze(parse('x = {if (call _this) exitWith {call _this}}'))
         self.assertEqual(analyzer.exceptions, [])
+
+    def test_undecided_nested_call_terminated_with_semicolon(self):
+        # foo could be anything, and the call could return different types => Anything
+        code = 'y = call { call foo; }'
+        analyzer = analyze(parse(code))
+        self.assertEqual(analyzer.exceptions, [])
+        self.assertEqual(Anything(), analyzer['y'])
 
 
 class Params(TestCase):
@@ -1099,7 +1107,7 @@ class UndefinedValues(TestCase):
         self.assertEqual(analyzer.exceptions, [])
         self.assertEqual(Number(), analyzer['y'])
 
-    def test_anything_for_undecided(self):
+    def test_anything_for_undecided_select(self):
         # x could be different things and select would return different types, so select returns Anything
         code = 'y = (x select 0)'
         analyzer = analyze(parse(code))

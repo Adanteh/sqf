@@ -507,7 +507,6 @@ class Analyzer(BaseInterpreter):
             outcome.position = base_tokens[0].position
 
         if statement.ending:
-            outcome = Nothing()
             outcome.position = base_tokens[0].position
 
         return outcome
