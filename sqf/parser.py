@@ -354,7 +354,11 @@ def is_end_statement(token, stop_statement):
     return token in STOP_KEYWORDS[stop_statement] or isinstance(token, EndOfFile)
 
 
-def parse_block(all_tokens, analyze_tokens, start=0, initial_lvls=None, stop_statement='both', defines=None):
+def parse_block(
+        all_tokens, analyze_tokens,
+        start=0, initial_lvls=None, stop_statement='both', defines=None
+) -> (IfDefStatement, int):
+
     if not initial_lvls:
         initial_lvls = _LEVELS
     if defines is None:
