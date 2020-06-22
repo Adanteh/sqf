@@ -1,7 +1,8 @@
+from sqf.context_writer import Context
 from sqf.types import Statement, Code, Number, Boolean, Nothing, Variable, Array, String, Type, File
 from sqf.interpreter_types import PrivateType
 from sqf.keywords import Keyword
-from sqf.parser import parse
+from sqf.parser import Parser
 from sqf.exceptions import SQFParserError
 from sqf.common_expressions import COMMON_EXPRESSIONS as EXPRESSIONS
 from sqf.interpreter_expressions import INTERPRETER_EXPRESSIONS
@@ -18,8 +19,8 @@ for exp in INTERPRETER_EXPRESSIONS:
 class Interpreter(BaseInterpreter):
     private_default_class = Nothing
 
-    def __init__(self, all_vars=None):
-        super().__init__(all_vars)
+    def __init__(self, all_vars=None, context=Context()):
+        super().__init__(all_vars, context)
 
         self._simulation = None
         self._client = None
@@ -81,6 +82,8 @@ class Interpreter(BaseInterpreter):
             tokens.append(t)
             types.append(type(v))
 
+        statement_context = self.context.with_position(statement.position)
+
         case_found = None
         for case in EXPRESSIONS:
             if case.is_match(values):
@@ -92,7 +95,7 @@ class Interpreter(BaseInterpreter):
         # todo: replace all elif below by expressions
         elif len(tokens) == 2 and tokens[0] == Keyword('publicVariable'):
             if not isinstance(tokens[1], String) or tokens[1].value.startswith('_'):
-                raise SQFParserError(statement.position, 'Interpretation of "%s" failed' % statement)
+                raise SQFParserError(statement_context, 'Interpretation of "%s" failed' % statement)
 
             var_name = tokens[1].value
             scope = self.get_scope(var_name, 'missionNamespace')
@@ -100,7 +103,7 @@ class Interpreter(BaseInterpreter):
 
         elif len(tokens) == 2 and tokens[0] == Keyword('publicVariableServer'):
             if not isinstance(tokens[1], String) or tokens[1].value.startswith('_'):
-                raise SQFParserError(statement.position, 'Interpretation of "%s" failed' % statement)
+                raise SQFParserError(statement_context, 'Interpretation of "%s" failed' % statement)
 
             var_name = tokens[1].value
             scope = self.get_scope(var_name, 'missionNamespace')
@@ -134,14 +137,14 @@ class Interpreter(BaseInterpreter):
                     lhs = self.get_variable(base_tokens[0])
 
                 if not isinstance(lhs, Variable) or not isinstance(rhs_v, Type):
-                    raise SQFParserError(statement.position, 'Interpretation of "%s" failed' % statement)
+                    raise SQFParserError(statement_context, 'Interpretation of "%s" failed' % statement)
 
                 scope = self.get_scope(lhs.name)
                 scope[lhs.name] = rhs_v
                 outcome = rhs
             elif op == Keyword('publicVariableClient'):
                 if not lhs_t == Number or rhs.value.startswith('_'):
-                    raise SQFParserError(statement.position, 'Interpretation of "%s" failed' % statement)
+                    raise SQFParserError(statement_context, 'Interpretation of "%s" failed' % statement)
                 client_id = lhs.value
                 var_name = rhs.value
                 scope = self.get_scope(var_name, 'missionNamespace')
@@ -150,7 +153,7 @@ class Interpreter(BaseInterpreter):
         elif len(tokens) == 1 and isinstance(tokens[0], (Type, Keyword)):
             outcome = values[0]
         else:
-            raise SQFParserError(statement.position, 'Interpretation of "%s" failed' % statement)
+            raise SQFParserError(statement_context, 'Interpretation of "%s" failed' % statement)
 
         if statement.ending:
             outcome = _outcome
@@ -163,7 +166,7 @@ def interpret(script, interpreter=None):
         interpreter = Interpreter()
     assert(isinstance(interpreter, Interpreter))
 
-    statements = parse(script)
+    statements = Parser(Context()).parse(script)
 
     file = File(statements._tokens)
     file.position = (1, 1)

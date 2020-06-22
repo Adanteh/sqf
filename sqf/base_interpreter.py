@@ -1,3 +1,4 @@
+from sqf.context_writer import Context
 from sqf.types import Statement, Code, Nothing, Anything, Variable, Array, String, Type, File
 from sqf.keywords import Keyword
 from sqf.exceptions import SQFParserError, SQFWarning
@@ -10,7 +11,7 @@ class BaseInterpreter:
     """
     private_default_class = Anything
 
-    def __init__(self, all_vars=None):
+    def __init__(self, all_vars=None, context=Context()):
         self._namespaces = {
             'uinamespace': sqf.namespace.Namespace('uinamespace'),
             'parsingnamespace': sqf.namespace.Namespace('parsingnamespace'),
@@ -19,12 +20,16 @@ class BaseInterpreter:
         }
 
         self.current_namespace = self.namespace('missionnamespace')
+        self.context = context
 
     def exception(self, exception):
         """
         We can overwrite this method to handle exceptions differently
         """
         raise exception
+
+    def raise_exception(self, exception_cls, position: (int, int), message: str):
+        self.exception(exception_cls(self.context.with_position(position), message))
 
     def set_global_variable(self, var_name, value):
         assert(isinstance(value, Type))
@@ -67,7 +72,7 @@ class BaseInterpreter:
 
         if len(arguments) > len(base_token):
             self.exception(
-                SQFWarning(base_token.position,
+                SQFWarning(self.context.with_position(base_token.position),
                            '`params` lhs (%d elements) is larger than rhs (%d elements).'
                            ' Some arguments are ignored.' % (len(arguments), len(base_token))))
 
@@ -77,7 +82,7 @@ class BaseInterpreter:
                     continue
                 self.add_privates([token])
                 if i >= len(arguments):
-                    self.exception(SQFWarning(token.position,
+                    self.exception(SQFWarning(self.context.with_position(token.position),
                                    '`params` mandatory argument %s is missing in rhs' % token))
                 else:
                     self.current_scope[token.value] = arguments[i]
@@ -92,9 +97,9 @@ class BaseInterpreter:
                     self.current_scope[token[0].value] = argument
                 else:
                     self.exception(
-                        SQFParserError(base_token.position, '`params` array element must have 2-4 elements'))
+                        SQFParserError(self.context.with_position(base_token.position), '`params` array element must have 2-4 elements'))
             else:
-                self.exception(SQFParserError(base_token.position, '`params` array element must be a string or array'))
+                self.exception(SQFParserError(self.context.with_position(base_token.position), '`params` array element must be a string or array'))
         return True
 
     def value(self, token, namespace_name=None):
@@ -144,11 +149,11 @@ class BaseInterpreter:
         """
         for variable in variables:
             if not isinstance(variable, String):
-                self.exception(SQFParserError(variable.position, 'Variable in private must be a string (is %s)' % type(variable)))
+                self.exception(SQFParserError(self.context.with_position(variable.position), 'Variable in private must be a string (is %s)' % type(variable)))
                 continue
 
             if not variable.value.startswith('_'):
-                self.exception(SQFParserError(variable.position, 'Cannot make global variable "%s" private (underscore missing?)' % variable.value))
+                self.exception(SQFParserError(self.context.with_position(variable.position), 'Cannot make global variable "%s" private (underscore missing?)' % variable.value))
                 continue
             self._add_private(variable)
 

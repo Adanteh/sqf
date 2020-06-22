@@ -69,7 +69,7 @@ class LogicalExpression(BinaryExpression):
         if isinstance(rhs, Code):
             result = interpreter.execute_code(rhs)
             if type(result) not in (Boolean, Nothing):
-                interpreter.exception(SQFParserError(rhs.position, 'code return must be a Boolean (returns %s)' % type(result).__name__))
+                interpreter.raise_exception(SQFParserError, interpreter.context.with_position(rhs.position), 'code return must be a Boolean (returns %s)' % type(result).__name__)
                 return None
         else:
             result = rhs
@@ -102,7 +102,7 @@ def _select_array(lhs, rhs, interpreter):
     count = rhs.value[1].value
 
     if start > len(lhs.value):
-        interpreter.exception(SQFParserError(lhs.position, 'Selecting element past size'))
+        interpreter.raise_exception(SQFParserError, lhs.position, 'Selecting element past size')
 
     return lhs.value[start:start + count]
 
@@ -138,13 +138,13 @@ def _setVariable(lhs_v, rhs_v, interpreter):
     assert(isinstance(rhs_v, Array))
 
     if len(rhs_v) not in [2, 3]:
-        interpreter.exception(SQFParserError(
-            rhs_v.position, 'setVariable requires array of 2-3 elements (has %d)' % (len(rhs_v))))
+        interpreter.raise_exception(SQFParserError,
+            rhs_v.position, 'setVariable requires array of 2-3 elements (has %d)' % (len(rhs_v)))
 
     # get the variable name
     if not isinstance(rhs_v.value[0], (String, Nothing)):
-        interpreter.exception(SQFParserError(
-            rhs_v.value[0].position, 'setVariable array first element must be a string (is %s)' % type(rhs_v.value[0]).__name__))
+        interpreter.raise_exception(SQFParserError,
+            rhs_v.value[0].position, 'setVariable array first element must be a string (is %s)' % type(rhs_v.value[0]).__name__)
 
     variable_name = rhs_v.value[0].value
     # get the value
@@ -163,12 +163,12 @@ def _getVariableString(lhs_v, rhs_v, interpreter):
 def _getVariableArray(lhs_v, rhs_v, interpreter):
     # get the variable name
     if len(rhs_v) != 2:
-        interpreter.exception(SQFParserError(
-            rhs_v.position, 'getVariable requires array of 2 elements (has %d)' % (len(rhs_v))))
+        interpreter.raise_exception(SQFParserError,
+            rhs_v.position, 'getVariable requires array of 2 elements (has %d)' % (len(rhs_v)))
 
     if not isinstance(rhs_v.value[0], (String, Nothing)):
-        interpreter.exception(SQFParserError(
-            rhs_v.value[0].position, 'getVariable array first element must be a string (is %s)' % type(rhs_v.value[0]).__name__))
+        interpreter.raise_exception(SQFParserError,
+            rhs_v.value[0].position, 'getVariable array first element must be a string (is %s)' % type(rhs_v.value[0]).__name__)
 
     variable = Variable(rhs_v.value[0].value)
     variable.position = rhs_v.value[0].position
@@ -223,12 +223,12 @@ def parse_switch(interpreter, code):
             values.append(v)
 
         if type(values[0]) != SwitchType:
-            interpreter.exception(SQFParserError(
-                statement.position, 'Switch code can only start with "case" or "default"'))
+            interpreter.raise_exception(SQFParserError,
+                statement.position, 'Switch code can only start with "case" or "default"')
 
         if values[0].keyword == Keyword('default'):
             if default_used:
-                interpreter.exception(SQFParserError(code.position, 'Switch code contains more than 1 `default`'))
+                interpreter.raise_exception(SQFParserError, code.position, 'Switch code contains more than 1 `default`')
             default_used = True
             assert(isinstance(values[0].result, Code))
             conditions.append(('default', values[0].result))

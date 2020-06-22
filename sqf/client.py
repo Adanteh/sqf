@@ -1,3 +1,4 @@
+from sqf.context_writer import Context
 from sqf.interpreter import Interpreter, interpret
 from sqf.types import Code, Array, String
 

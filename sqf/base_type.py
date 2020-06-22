@@ -1,10 +1,10 @@
-
-
 def get_coord(string):
     lines = string.split('\n')
     line = len(lines)
     column = len(lines[-1]) + 1
     return line, column
+
+
 assert(get_coord('aa') == (1, 3))
 
 
@@ -30,13 +30,15 @@ assert(get_diff('aa\na') == (1, 1))
 
 
 class BaseType:
+    _position: (int, int)
+
     """
     This class is used to count the string-coordinate (line, column) of any element in a statement.
     This is used for identifying, in a script, the line and column of an error.
     It also defines the __eq__
     """
     def __init__(self):
-        self._position = None
+        self._position = (0, 0)
 
     @property
     def _key(self):
@@ -52,7 +54,7 @@ class BaseType:
     def __hash__(self):
         return hash(self._key)
 
-    def set_position(self, position):
+    def set_position(self, position: (int, int)):
         assert (isinstance(position, tuple))
         assert (len(position) == 2)
         self._position = position
@@ -116,7 +118,7 @@ class BaseTypeContainer(BaseType):
             )
 
     @BaseType.position.setter
-    def position(self, position):
+    def position(self, position: (int, int)):
         super().set_position(position)
 
     @property

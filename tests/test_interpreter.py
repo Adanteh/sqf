@@ -95,20 +95,24 @@ class TestInterpreter(TestCase):
     def test_get_variable(self):
         with self.assertRaises(SQFParserError) as cm:
             interpret('missionnamespace getVariable ["x"]')
-        self.assertEqual((1, 29), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(29, cm.exception.context.col)
 
         with self.assertRaises(SQFParserError) as cm:
             interpret('missionnamespace getVariable [1, 2]')
-        self.assertEqual((1, 31), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(31, cm.exception.context.col)
 
     def test_set_variable(self):
         with self.assertRaises(SQFParserError) as cm:
             interpret('missionnamespace setVariable ["x"]')
-        self.assertEqual((1, 29), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(29, cm.exception.context.col)
 
         with self.assertRaises(SQFParserError) as cm:
             interpret('missionnamespace setVariable [1, 2]')
-        self.assertEqual((1, 31), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(31, cm.exception.context.col)
 
 
 class TestInterpretArray(TestCase):
@@ -375,32 +379,39 @@ class Switch(TestCase):
         # 2 defaults error
         with self.assertRaises(SQFParserError) as cm:
             interpret('switch (0) do {case (1): {"one"}; default {"as"}; default {"ass"}}')
-        self.assertEqual((1, 14), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(14, cm.exception.context.col)
+
 
         # more than one code
         with self.assertRaises(SQFParserError) as cm:
             interpret('switch (0) do {case 1: {}')
-        self.assertEqual((1, 15), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(15, cm.exception.context.col)
 
         # more than one code
         with self.assertRaises(SQFParserError) as cm:
             interpret('switch (0) do {1 + 1}')
-        self.assertEqual((1, 16), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(16, cm.exception.context.col)
 
         # case without arguments
         with self.assertRaises(SQFParserError) as cm:
             interpret('switch (0) do {case;')
-        self.assertEqual((1, 15), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(15, cm.exception.context.col)
 
         # case without arguments
         with self.assertRaises(SQFParserError) as cm:
             interpret('switch (0) do {1}')
-        self.assertEqual((1, 16), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(16, cm.exception.context.col)
 
         # default without argument
         with self.assertRaises(SQFParserError) as cm:
             interpret('switch (0) do {default: {}}')
-        self.assertEqual((1, 16), cm.exception.position)
+        self.assertEqual(1, cm.exception.context.line)
+        self.assertEqual(16, cm.exception.context.col)
 
 
 class Scopes(TestCase):

@@ -3,31 +3,25 @@ import os
 import re
 import sys
 
-from sqf.parser import parse
+from sqf.parser import Parser
 import sqf.analyzer
 from sqf.exceptions import SQFParserError, SQFWarning
+from sqf.context_writer import Context, AnalysisWriter
 
 
-class Writer:
-    def __init__(self):
-        self.strings = []
-
-    def write(self, message):
-        self.strings.append(message)
-
-
-def analyze(code, writer, exceptions_list):
+def analyze(code, writer: AnalysisWriter, exceptions_list, context=Context()):
     try:
-        result = parse(code)
+        result = Parser(context).parse(code)
     except SQFParserError as e:
-        writer.write('[%d,%d]:%s\n' % (e.position[0], e.position[1] - 1, e.message))
+        writer.log(e.context, e.level, e.message)
         exceptions_list += [e]
         return
 
-    exceptions = sqf.analyzer.analyze(result).exceptions
+    exceptions = sqf.analyzer.analyze(result, context=context).exceptions
     for e in exceptions:
-        writer.write('[%d,%d]:%s\n' % (e.position[0], e.position[1] - 1, e.message))
+        writer.log(e.context, e.level, e.message)
     exceptions_list += exceptions
+
 
 def analyze_dir(directory, writer, exceptions_list, exclude):
     """
@@ -45,15 +39,11 @@ def analyze_dir(directory, writer, exceptions_list, exclude):
                     writer.write(file_path + ' EXCLUDED\n')
                     continue
 
-                writer_helper = Writer()
+                writer_helper = AnalysisWriter(writer)
 
                 with open(file_path) as f:
-                    analyze(f.read(), writer_helper, exceptions_list)
+                    analyze(f.read(), writer_helper, exceptions_list, Context(os.path.relpath(file_path, directory)))
 
-                if writer_helper.strings:
-                    writer.write(os.path.relpath(file_path, directory) + '\n')
-                    for string in writer_helper.strings:
-                        writer.write('\t%s' % string)
     return writer
 
 
@@ -91,14 +81,15 @@ def entry_point(args):
         writer = args.output
 
     exceptions_list = []
+    analysis_writer = AnalysisWriter(writer)
 
     if args.file is None and args.directory is None:
         code = sys.stdin.read()
-        analyze(code, writer, exceptions_list)
+        analyze(code, analysis_writer, exceptions_list)
     elif args.file is not None:
         code = args.file.read()
         args.file.close()
-        analyze(code, writer, exceptions_list)
+        analyze(code, analysis_writer, exceptions_list)
     else:
         directory = args.directory.rstrip('/')
         exclude = list(map(lambda x: x if x.startswith('/') else os.path.join(directory, x), args.exclude))

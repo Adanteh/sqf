@@ -1,29 +1,31 @@
+from sqf.context_writer import Context
+
+
+"""
+Raised by the parser and analyzer
+"""
 class SQFError(Exception):
-    """
-    Raised by the parser and analyzer
-    """
-    def __init__(self, position, message):
-        assert(isinstance(position, tuple))
-        self.position = position
+    level = ''
+
+    def __init__(self, context: Context, message: str):
+        self.context = context
         self.message = message.replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r")
 
 
+"""
+Raised by the parser and analyzer
+"""
 class SQFParserError(SQFError):
-    """
-    Raised by the parser and analyzer
-    """
-    def __init__(self, position, message):
-        super().__init__(position, "error:%s" % message)
+    level = 'error'
 
 
 class SQFParenthesisError(SQFParserError):
     pass
 
 
+"""
+Something that the interpreter understands but that is a bad practice or potentially
+semantically incorrect.
+"""
 class SQFWarning(SQFError):
-    """
-    Something that the interpreter understands but that is a bad practice or potentially
-    semantically incorrect.
-    """
-    def __init__(self, position, message):
-        super().__init__(position, "warning:%s" % message)
+    level = 'warning'

@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import List
 
 from sqf.types import Statement, Code, Nothing, Variable, Array, String, Type, File, BaseType, \
     Number, Preprocessor, Script, Anything
@@ -6,13 +7,14 @@ from sqf.interpreter_types import InterpreterType, PrivateType, ForType, SwitchT
     DefineStatement, DefineResult, IfDefResult
 from sqf.keywords import Keyword, PREPROCESSORS
 from sqf.expressions import UnaryExpression, BinaryExpression
-from sqf.exceptions import SQFParserError, SQFWarning
+from sqf.exceptions import SQFParserError, SQFWarning, SQFError
 from sqf.base_interpreter import BaseInterpreter
 from sqf.database import EXPRESSIONS
 from sqf.common_expressions import COMMON_EXPRESSIONS, ForEachExpression, ElseExpression
 from sqf.expressions_cache import values_to_expressions, build_database
 from sqf.parser_types import Comment
-from sqf.parser import parse
+from sqf.parser import Parser
+from sqf.context_writer import Context
 
 
 def all_equal(iterable):
@@ -62,9 +64,9 @@ class Analyzer(BaseInterpreter):
     """
     COMMENTS_FOR_PRIVATE = {'IGNORE_PRIVATE_WARNING', 'USES_VARIABLES'}
 
-    def __init__(self, all_vars=None):
-        super().__init__(all_vars)
-        self.exceptions = []
+    def __init__(self, all_vars=None, context=Context()):
+        super().__init__(all_vars, context)
+        self.exceptions: List[SQFError] = []
 
         self.privates = set()
         self.unevaluated_interpreter_tokens = []
@@ -113,7 +115,7 @@ class Analyzer(BaseInterpreter):
             scope = self.get_scope(token.name, namespace_name)
             if scope.level == 0 and not token.is_global:
                 self.exception(
-                    SQFWarning(token.position, 'Local variable "%s" is not from this scope (not private)' % token))
+                    SQFWarning(self.context.with_position(token.position), 'Local variable "%s" is not from this scope (not private)' % token))
 
             try:
                 result = scope[token.name]
@@ -147,7 +149,7 @@ class Analyzer(BaseInterpreter):
         """
         # interpret the statement recursively
         if isinstance(token, Statement):
-            result = self.execute_single(statement=token)
+            result = self.execute_single(token)
             # we do not want the position of the statement, but of the token, so we do not
             # store it here
         elif isinstance(token, Array) and token.value is not None:
@@ -184,7 +186,8 @@ class Analyzer(BaseInterpreter):
 
         self.exceptions.extend(analyzer.exceptions)
 
-    def execute_code(self, code, extra_scope=None, namespace_name='missionnamespace', delete_mode=False):
+    def execute_code(self, code,
+                     extra_scope=None, namespace_name='missionnamespace', delete_mode=False):
         key = self.code_key(code)
         exe_code_key = self.exe_code_key(code, extra_scope)
 
@@ -205,11 +208,11 @@ class Analyzer(BaseInterpreter):
             # collect `private` statements that have a variable but were not collected by the assignment operator
             # this check is made at the scope level
             for private in self.privates:
-                self.exception(SQFWarning(private.position, 'private argument must be a string.'))
+                self.exception(SQFWarning(self.context.with_position(private.position), 'private argument must be a string.'))
 
             # this check is made at the scope level
             for token in self.unevaluated_interpreter_tokens:
-                self.exception(SQFWarning(token.position, 'helper type "%s" not evaluated' % token.__class__.__name__))
+                self.exception(SQFWarning(self.context.with_position(token.position), 'helper type "%s" not evaluated' % token.__class__.__name__))
 
             # this check is made at script level
             if not delete_mode:
@@ -218,7 +221,7 @@ class Analyzer(BaseInterpreter):
                     if self.variable_uses[key]['count'] == 0:
                         variable = self.variable_uses[key]['variable']
                         self.exception(
-                            SQFWarning(variable.position, 'Variable "%s" not used' % variable.value))
+                            SQFWarning(self.context.with_position(variable.position), 'Variable "%s" not used' % variable.value))
 
         return outcome
 
@@ -266,9 +269,9 @@ class Analyzer(BaseInterpreter):
 
         if scope.level == 0 and lhs_name.startswith('_'):
             self.exception(
-                SQFWarning(lhs_position, 'Local variable "%s" assigned to an outer scope (not private)' % lhs_name))
+                SQFWarning(self.context.with_position(lhs_position), 'Local variable "%s" assigned to an outer scope (not private)' % lhs_name))
 
-    def execute_single(self, statement):
+    def execute_single(self, statement: Statement):
         assert(isinstance(statement, Statement))
 
         outcome = Nothing()
@@ -284,15 +287,17 @@ class Analyzer(BaseInterpreter):
         if not base_tokens:
             return outcome
 
+        token_context: Context = self.context.with_position(base_tokens[0].position)
+
         # operations that cannot evaluate the value of all base_tokens
         if type(base_tokens[0]) == DefineStatement:
             return base_tokens[0]
         elif base_tokens[0] == Preprocessor("#include"):
             if len(base_tokens) != 2:
-                exception = SQFParserError(base_tokens[0].position, "#include requires one argument")
+                exception = SQFParserError(token_context, "#include requires one argument")
                 self.exception(exception)
             elif type(self.execute_token(base_tokens[1])) != String:
-                exception = SQFParserError(base_tokens[0].position, "#include first argument must be a string")
+                exception = SQFParserError(token_context, "#include first argument must be a string")
                 self.exception(exception)
             return outcome
         elif isinstance(base_tokens[0], Keyword) and base_tokens[0].value in PREPROCESSORS:
@@ -306,7 +311,7 @@ class Analyzer(BaseInterpreter):
             elif isinstance(rhs, Array):
                 value = self.value(rhs)
                 if value.is_undefined:
-                    self.exception(SQFWarning(base_tokens[0].position,
+                    self.exception(SQFWarning(token_context,
                                               'Obfuscated statement. Consider explicitly set what is private.'))
                 else:
                     self.add_privates(value)
@@ -318,7 +323,7 @@ class Analyzer(BaseInterpreter):
                 outcome.position = rhs.position
                 self.privates.add(outcome)
             else:
-                self.exception(SQFParserError(base_tokens[0].position, '`private` used incorrectly'))
+                self.exception(SQFParserError(token_context, '`private` used incorrectly'))
             return outcome
         # assignment operator
         elif len(base_tokens) == 3 and base_tokens[1] == Keyword('='):
@@ -330,7 +335,7 @@ class Analyzer(BaseInterpreter):
                 lhs = self.get_variable(base_tokens[0])
 
             if not isinstance(lhs, Variable):
-                self.exception(SQFParserError(base_tokens[0].position, 'lhs of assignment operator must be a variable'))
+                self.exception(SQFParserError(token_context, 'lhs of assignment operator must be a variable'))
             else:
                 # if the rhs_v is code and calls `lhs` (recursion) it will assume lhs is anything (and not Nothing)
                 scope = self.get_scope(lhs.name)
@@ -395,12 +400,12 @@ class Analyzer(BaseInterpreter):
                     # when the string is undefined, there is no need to evaluate it.
                     if not values[code_position].is_undefined:
                         try:
-                            code = Code([parse(values[code_position].value)])
+                            code = Code([Parser(self.context).parse(values[code_position].value)])
                             code.position = values[code_position].position
                             self.execute_code(code, extra_scope=extra_scope)
                         except SQFParserError as e:
                             self.exceptions.append(
-                                SQFParserError(values[code_position].position,
+                                SQFParserError(self.context.with_position(values[code_position].position),
                                                'Error while parsing a string to code: %s' % e.message))
                 # finally, execute the statement
                 outcome = case_found.execute(values, self)
@@ -449,7 +454,7 @@ class Analyzer(BaseInterpreter):
         elif len(values) == 1:
             if not isinstance(values[0], Type):
                 self.exception(
-                    SQFParserError(statement.position, '"%s" is syntactically incorrect (missing ;?)' % statement))
+                    SQFParserError(self.context.with_position(statement.position), '"%s" is syntactically incorrect (missing ;?)' % statement))
             outcome = values[0]
         elif isinstance(base_tokens[0], Variable) and base_tokens[0].is_global:
             # statements starting with a global are likely defined somewhere else
@@ -483,14 +488,14 @@ class Analyzer(BaseInterpreter):
             else:
                 assert False
 
-            self.exception(SQFParserError(values[1].position, message))
+            self.exception(SQFParserError(self.context.with_position(values[1].position), message))
             # so the error does not propagate further
             outcome = Anything()
             outcome.position = base_tokens[0].position
         else:
             helper = ' '.join(['<%s(%s)>' % (type(t).__name__, t) for t in tokens])
             self.exception(
-                SQFParserError(base_tokens[-1].position, 'can\'t interpret statement (missing ;?): %s' % helper))
+                SQFParserError(self.context.with_position(base_tokens[-1].position), 'can\'t interpret statement (missing ;?): %s' % helper))
             # so the error does not propagate further
             outcome = Anything()
             outcome.position = base_tokens[0].position
@@ -518,7 +523,7 @@ class Analyzer(BaseInterpreter):
             if matches:
                 length = len(matches[0]) + 1  # +1 for the space
                 try:
-                    parsed_statement = parse(string[length:])
+                    parsed_statement = Parser(Context()).parse(string[length:])
                     array = parsed_statement[0][0]
                     assert(isinstance(array, Array))
                     self.add_privates(self.value(array))
@@ -528,13 +533,13 @@ class Analyzer(BaseInterpreter):
                             token = token.base_tokens[0]
                         self.current_scope[token.value] = Anything()
                 except Exception:
-                    self.exception(SQFWarning(statement.position, '{0} comment must be `//{0} ["var1",...]`'.format(matches[0])))
+                    self.exception(SQFWarning(self.context.with_position(statement.position), '{0} comment must be `//{0} ["var1",...]`'.format(matches[0])))
 
 
-def analyze(statement, analyzer=None):
+def analyze(statement: Statement, analyzer=None, context=Context()):
     assert (isinstance(statement, Statement))
     if analyzer is None:
-        analyzer = Analyzer()
+        analyzer = Analyzer(context=context)
 
     file = File(statement.tokens)
 
