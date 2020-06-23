@@ -11,7 +11,7 @@ class BaseInterpreter:
     """
     private_default_class = Anything
 
-    def __init__(self, all_vars=None, context=Context(), get_include_file=lambda get_file: File):
+    def __init__(self, all_vars=None, context=Context(), get_include_file=lambda get_file, context: File):
         self._namespaces = {
             'uinamespace': sqf.namespace.Namespace('uinamespace'),
             'parsingnamespace': sqf.namespace.Namespace('parsingnamespace'),
@@ -136,7 +136,8 @@ class BaseInterpreter:
     def do_include(self, path: str):
         if self.get_include_file is None:
             raise NotImplementedError("I dont have a callback to do includes :(")
-        file = self.get_include_file(path)
+        self.context.push_include(path)
+        file = self.get_include_file(path, self.context)
         return self.execute_code(file)
 
     def get_scope(self, name, namespace_name=None):

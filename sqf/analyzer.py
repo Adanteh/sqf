@@ -302,11 +302,13 @@ class Analyzer(BaseInterpreter):
             else:
                 # check if file to include actually exists somewhere. hm. should be in base_interpreter TODO
                 try:
-                    self.do_include(base_tokens[1])
+                    self.do_include(self.execute_token(base_tokens[1]).value)
                 except NotImplementedError:
                     pass
-                except Exception:
-                    self.exception(SQFParserError(token_context, "encountered some error in #include"))
+                except FileNotFoundError as e:
+                    self.exception(SQFWarning(token_context, "#include failed: %s" % e.filename))
+                except SQFParserError as e:
+                    self.exception(e)
             return outcome
         elif isinstance(base_tokens[0], Keyword) and base_tokens[0].value in PREPROCESSORS:
             # remaining preprocessors are ignored
@@ -547,7 +549,11 @@ class Analyzer(BaseInterpreter):
 def analyze(statement: Statement, analyzer=None, context=Context()):
     assert (isinstance(statement, Statement))
     if analyzer is None:
-        analyzer = Analyzer(context=context)
+        analyzer = Analyzer(
+            context=context,
+            get_include_file=lambda fname, ctx:
+                Parser(ctx).parse(open(fname).read())
+        )
 
     file = File(statement.tokens)
 
