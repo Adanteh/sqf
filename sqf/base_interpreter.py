@@ -134,6 +134,8 @@ class BaseInterpreter:
         raise NotImplementedError
 
     def do_include(self, path: str):
+        if self.get_include_file is None:
+            raise NotImplementedError("I dont have a callback to do includes :(")
         file = self.get_include_file(path)
         return self.execute_code(file)
 
