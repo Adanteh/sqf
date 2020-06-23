@@ -301,8 +301,12 @@ class Analyzer(BaseInterpreter):
                 self.exception(exception)
             else:
                 # check if file to include actually exists somewhere. hm. should be in base_interpreter TODO
-                self.do_include(base_tokens[1])
-
+                try:
+                    self.do_include(base_tokens[1])
+                except NotImplementedError:
+                    pass
+                except Exception:
+                    self.exception(SQFParserError(token_context, "encountered some error in #include"))
             return outcome
         elif isinstance(base_tokens[0], Keyword) and base_tokens[0].value in PREPROCESSORS:
             # remaining preprocessors are ignored

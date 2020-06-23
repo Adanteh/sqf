@@ -568,9 +568,17 @@ class Preprocessor(TestCase):
         self.assertEqual(1, errors[0].context.col)
 
     def test_include_with_semi_colon(self):
-        code = '#include "a.sqf";\n'
+        code = '#include "test_includes_dir\\test.sqf";\n'
         analyzer = analyze(self.parser.parse(code))
         self.assertEqual(analyzer.exceptions, [])
+
+    def test_include_with_failing_include(self):
+        code = '#include "does_not_exist.sqf";\n'
+        analyzer = analyze(self.parser.parse(code))
+        errors = analyzer.exceptions
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(1, errors[0].context.line)
+        self.assertEqual(1, errors[0].context.col)
 
     def test_macros(self):
         code = 'x call EFUNC(api,setMultiPushToTalkAssignment)'
