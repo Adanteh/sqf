@@ -299,6 +299,10 @@ class Analyzer(BaseInterpreter):
             elif type(self.execute_token(base_tokens[1])) != String:
                 exception = SQFParserError(token_context, "#include first argument must be a string")
                 self.exception(exception)
+            else:
+                # check if file to include actually exists somewhere. hm. should be in base_interpreter TODO
+                self.do_include(base_tokens[1])
+
             return outcome
         elif isinstance(base_tokens[0], Keyword) and base_tokens[0].value in PREPROCESSORS:
             # remaining preprocessors are ignored

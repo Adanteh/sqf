@@ -132,6 +132,10 @@ class BaseInterpreter:
         """
         raise NotImplementedError
 
+    def do_include(self, path: str):
+        return Nothing()
+
+
     def get_scope(self, name, namespace_name=None):
         if namespace_name is None:
             namespace = self.current_namespace
