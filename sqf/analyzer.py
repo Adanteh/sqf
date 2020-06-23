@@ -64,8 +64,8 @@ class Analyzer(BaseInterpreter):
     """
     COMMENTS_FOR_PRIVATE = {'IGNORE_PRIVATE_WARNING', 'USES_VARIABLES'}
 
-    def __init__(self, all_vars=None, context=Context()):
-        super().__init__(all_vars, context)
+    def __init__(self, all_vars=None, context=Context(), get_include_file=None):
+        super().__init__(all_vars, context, get_include_file)
         self.exceptions: List[SQFError] = []
 
         self.privates = set()

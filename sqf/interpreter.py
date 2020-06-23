@@ -19,8 +19,8 @@ for exp in INTERPRETER_EXPRESSIONS:
 class Interpreter(BaseInterpreter):
     private_default_class = Nothing
 
-    def __init__(self, all_vars=None, context=Context()):
-        super().__init__(all_vars, context)
+    def __init__(self, all_vars=None, context=Context(), get_include_file=lambda file: None):
+        super().__init__(all_vars, context, get_include_file)
 
         self._simulation = None
         self._client = None
